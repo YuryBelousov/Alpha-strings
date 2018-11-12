@@ -29,17 +29,15 @@ void make_alpha_signature(all_alphas_type& all_signatures, all_alphas_type& all_
 int main(){
 	//Select maximum complexity of generating alpha-string
 	int max_complexity = 5;
-	//Create container for alpha-strings and insert the simplest alpha-string there
+	//Create container for alpha-strings and insert the simplest (empty) alpha-string there
 	all_alphas_type all_signuters(1);	
 	all_alphas_type all_interesting_signuters(1);
-
 	all_signuters[0].push_back(alpha_string());
-	
+	//Generate alpha-strings for each complexity up to max_complexity
 	for (size_t n = 0; n < max_complexity; ++n)
 		make_alpha_signature(all_signuters, all_interesting_signuters, n);
-
+	//Output interesting alpha-strings into the file
 	ofstream file_out("alpha-strings up to complexity " + to_string(max_complexity) +".txt");
-
 	for (size_t i = 0; i <= max_complexity; ++i) {
 		if (all_interesting_signuters[i].size() > 0) {
 			file_out << "Interesting alpha-strings with complexity " << i << " (" << all_interesting_signuters[i].size() << "):" << endl;
