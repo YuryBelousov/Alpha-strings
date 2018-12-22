@@ -7,19 +7,28 @@
 using namespace std;
 /*
 Here is a class for alpha-string: specific modification of the Gauss code.
-It has the form: A_{l_k}A_{l_{k-1}}...A_{l_1} | A_{r_1}A_{r_2}...A_{r_k}, 
-where for each i in 1:k there exists j in 1:k such that  A_{l_i} = A_{r_j}. 
+It has the form: A_{1}A_{2}}...A_{n/2} | A_{n/2+1}A_{n/2+2}...A_{n}, 
+where for all i in 1:k either 
+A_i = \inf 
+or 
+there exists j in 1:n such that  A_{i} = A_{j}. 
+
+Here \inf means a crossing, which meets only once in the alpha-string 
+If there exists any \inf alpha --- it is not an alpha-string, but 
+a substring of a some alpha-string.
 
 Such strings are stored in vector in a form somewhat similar to chord diagrams. 
 It is a vector of integers (of indexes), where
-if A_{l_i} = A_{r_j} then alphas[k - l_i] = k - 1 + r_j and alphas[k - 1 + r_j] = k - l_i.
+if A_{i} = A_{j} then alphas[n - i] = n - 1 + j and alphas[n - 1 + j] = n - i.
 */
 
 class alpha_string {
 private:
-	int num_of_alphas;		//Number of alphas in the string. It is the same as alphas.size();
+	const static int inf_alpha = -1;	//Constant for an \inf alpha
+private:
+	int num_of_alphas;		//Number of alphas in the string. It is the same as alphas.size()
 	vector <int> alphas;	//Notice: i = alpha[alpha[i]]
-
+	bool is_substring;		//If this alpha-string contains any \inf-alphas
 public:
 	//Default constructors
 	alpha_string()						= default;
@@ -28,9 +37,13 @@ public:
 
 	//Construct alpha-string from a vector
 	explicit alpha_string(const vector <int>& _alphas) {
+		//By default we think that our alpha-string is not a substring
+		is_substring = false;
 		//Check if _alphas presents a correct alpha-string
 		for (int i = 0; i < _alphas.size(); ++i) {
-			if ((i != _alphas[_alphas[i]]) || (i == _alphas[i])) {
+			if (_alphas[i] == inf_alpha)
+				is_substring = true;
+			else if ((i != _alphas[_alphas[i]]) || (i == _alphas[i])) {
 				num_of_alphas = 0;
 				return;
 			}
@@ -46,7 +59,15 @@ public:
 			return false;
 		if (A.alphas == alphas)
 			return true;
-		//Compare alpha with A.alpha reversed relative to center point 
+	}
+
+	//Compare up to mirror image
+	bool is_equal(const alpha_string& A) const {
+		if (A.num_of_alphas != num_of_alphas)
+			return false;
+		if (A.alphas == alphas)
+			return true;
+		//Compare alpha with A.alpha reversed 
 		for (int i = 0; i < num_of_alphas; ++i)
 			if (A.alphas[i] != num_of_alphas - 1 - alphas[num_of_alphas - 1 - i])
 				return false;
@@ -58,7 +79,7 @@ public:
 	}
 
 	//Create alpha-string by adding new arc from first_ind to last_ind to the current string
-	alpha_string expand_by_arc(int first_ind, int last_ind) const {
+	alpha_string expand_by_arc(int first_ind, int last_ind, bool is_two_inf_arcs = false) const {
 		//Check if new indexes are correct
 		if (first_ind < 0)
 			first_ind = 0;
@@ -75,11 +96,16 @@ public:
 
 		//Create new alpha-string with n + 2 alphas
 		alpha_string temp;
+		temp.is_substring = is_two_inf_arcs;
 		temp.alphas.resize(num_of_alphas + 2);
 		temp.num_of_alphas = num_of_alphas + 2;
 		//Make first arc
-		temp.alphas[first_ind] = last_ind;
-		temp.alphas[last_ind] = first_ind;
+		if (is_two_inf_arcs)
+			temp.alphas[first_ind] = temp.alphas[last_ind] = inf_alpha;
+		else {
+			temp.alphas[first_ind] = last_ind;
+			temp.alphas[last_ind] = first_ind;
+		}
 		//This function is used to copy alphas from current string to temp taking into account ends of new arc
 		auto change_func = [](int& a, int b, int first_ind, int last_ind) {
 			if (b < first_ind)
@@ -103,17 +129,24 @@ public:
 	bool simple() const {
 		//Check if all alphas can be eliminated without passing through a loop. 
 		//It means that there exists M, such that in subsequence {A_{l_M}, A_{l_{M-1}},..A{l_1} | A_{r_1},.., A_{r_{n/2-M}}} all elements are different
-		//If i = 1 || i = num_of_alphas / 2 - 1 all alphas can be eliminated in linear time but constant is too big, so we have to analyze it in more detail.
-		for (int i = 0; i < num_of_alphas / 2 - 1; ++i) {
-			if (i == 1)
-				continue;
+		for (int i = 0; i < num_of_alphas / 2; ++i) {
+			//If i = 0, or 1, or num_of_alphas / 2 - 1 all alphas can be eliminated in linear time but constant is too big, so we have to analyze it in more detail.
+			//if (i == 1)
+			//	continue;
 			int j = 0;
 			for (; j < num_of_alphas / 2; ++j)
-				if ((alphas[i + j] >= i) && (alphas[i + j] < i + num_of_alphas / 2))
+				if ((alphas[i + j] != inf_alpha) && (alphas[i + j] >= i) && (alphas[i + j] < i + num_of_alphas / 2))
 					break;
 			if (j == num_of_alphas / 2)
 				return true;
 		}
+		if (is_substring) {
+			for (int j = 0; j < num_of_alphas / 2; ++j)
+				if ((alphas[j] != inf_alpha) && (alphas[j] < num_of_alphas / 2) || (alphas[num_of_alphas / 2 + j] != inf_alpha) && (alphas[num_of_alphas / 2 + j] >= num_of_alphas / 2))
+					return false;
+			return true;
+		}
+
 		return false;
 	}
 
@@ -129,19 +162,27 @@ public:
 	friend ostream& operator<<(ostream& out, const alpha_string& _a_str) {
 		vector <int> temp = _a_str.alphas;
 		vector <bool> temp_not_changed(_a_str.num_of_alphas, true);	//Show if alphas[i] already have a name in alpha-string
-		int num = 0;											//Name of current alpha
+		int num = 0;												//Name of current alpha
 		//Prepare right part
 		for (int i = _a_str.num_of_alphas / 2; i < _a_str.num_of_alphas; ++i) {
 			if (temp_not_changed[i]) {
-				temp_not_changed[i] = temp_not_changed[_a_str.alphas[i]] = false;
-				temp[i] = temp[_a_str.alphas[i]] = ++num;
+				temp_not_changed[i] = false;
+				temp[i] = ++num;
+				if (_a_str.alphas[i] != _a_str.inf_alpha) {
+					temp_not_changed[_a_str.alphas[i]] = false;
+					temp[_a_str.alphas[i]] = num;
+				}
 			}
 		}
 		//Prepare left part
 		for (int i = _a_str.num_of_alphas / 2 - 1; i > -1; --i) {
 			if (temp_not_changed[i]) {
-				temp_not_changed[i] = temp_not_changed[_a_str.alphas[i]] = false;
-				temp[i] = temp[_a_str.alphas[i]] = ++num;
+				temp_not_changed[i] = false;
+				temp[i] = ++num;
+				if (_a_str.alphas[i] != _a_str.inf_alpha) {
+					temp_not_changed[_a_str.alphas[i]] = false;
+					temp[_a_str.alphas[i]] = num;
+				}
 			}
 		}
 		//Print result
